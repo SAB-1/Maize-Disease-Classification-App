@@ -488,9 +488,23 @@ st.markdown("""
 # ════════════════════════════════════════════════════════════════
 t1, t2, t3 = st.columns(3)
 with t1:
-    st.markdown("""<div class='stat-tile'>
-        <div class='stat-tile-value'>🔍</div>
-        <div class='stat-tile-label'>Diseases Detected</div>
+    if st.session_state.get("last_result"):
+        class_idx = st.session_state["last_result"]["class_idx"]
+        predicted_class = CLASS_NAMES[class_idx].replace("_", " ")
+
+        if predicted_class == "Healthy":
+            tile_value = "🟢"
+            tile_label = "Healthy"
+        else:
+            tile_value = "🔴"
+            tile_label = predicted_class   # show actual class name
+    else:
+        tile_value = "❔"
+        tile_label = "Awaiting Prediction"
+
+    st.markdown(f"""<div class='stat-tile'>
+        <div class='stat-tile-value'>{tile_value}</div>
+        <div class='stat-tile-label'>{tile_label}</div>
     </div>""", unsafe_allow_html=True)
 with t2:
     st.markdown("""<div class='stat-tile'>
