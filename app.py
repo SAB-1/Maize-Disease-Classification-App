@@ -498,10 +498,9 @@ with t2:
         <div class='stat-tile-label'>Model Precision</div>
     </div>""", unsafe_allow_html=True)
 with t3:
-    predictions_made = st.session_state.get("predictions_made", 0)
     st.markdown(f"""<div class='stat-tile'>
-        <div class='stat-tile-value'>{predictions_made}</div>
-        <div class='stat-tile-label'>Crops Analyzed</div>
+        <div class='stat-tile-value'>4</div>
+        <div class='stat-tile-label'>Classes</div>
     </div>""", unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
@@ -537,7 +536,6 @@ with right:
             class_idx = np.argmax(preds)
             confidence = np.max(preds)
 
-            st.session_state["predictions_made"] = st.session_state.get("predictions_made", 0) + 1
             st.session_state["last_result"] = {
                 "preds": preds, "class_idx": class_idx,
                 "confidence": confidence, "image": image
@@ -556,13 +554,17 @@ with right:
         class_idx  = result["class_idx"]
         confidence = result["confidence"]
 
+        # Determine if prediction is "Healthy" or "Disease Detected"
+        is_healthy = CLASS_NAMES[class_idx] == 'Healthy'
+        status_text = "Good 🥬" if is_healthy else "Disease Detected 🔍"
+
         st.markdown(f"""
         <div style='text-align:center;margin-bottom:20px;'>
             <div style='font-size:0.75rem;color:#6b7280;text-transform:uppercase;
                         letter-spacing:0.1em;margin-bottom:8px;font-weight:600;'>
                 DETECTED CLASS
             </div>
-            <div class='result-pill'>{CLASS_NAMES[class_idx].replace('_', ' ')}</div>
+            <div class='result-pill'>{status_text}</div>
             <br>
             <div class='confidence-big'>{confidence*100:.2f}%</div>
             <div class='confidence-sub'>Model Confidence</div>
