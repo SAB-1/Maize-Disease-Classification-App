@@ -323,66 +323,97 @@ def preprocess_image(image: Image.Image):
     return img_array
 
 # ════════════════════════════════════════════════════════════════
-# 6. Grad-CAM helpers
+# 6. Grad-CAM helpers — FIXED VERSION
 # ════════════════════════════════════════════════════════════════
 def make_gradcam_heatmap(img_array, model, conv_layer):
     """
-    Build a sub-model from model.inputs → (last_conv output, softmax output).
-    Uses the layer object directly and finds the output layer by scanning.
+    Compute Grad-CAM using the full model instead of a sub-model.
+    This bypasses issues with frozen layers or type mismatches.
     
-    FIX: Added proper gradient tape watching and None-checks for grads and heatmap.
+    Strategy: 
+    1. Create intermediate model from input to conv_layer output
+    2. Create another model from input to final predictions
+    3. Compute gradients w.r.t. conv_layer output through the full chain
     """
-    # Find the actual output layer (should be Dense with softmax)
-    output_layer = None
-    for layer in model.layers[::-1]:
-        if isinstance(layer, (tf.keras.layers.Dense,)):
-            output_layer = layer
-            break
-    
-    if output_layer is None:
-        raise ValueError("Could not find output Dense layer")
-    
-    grad_model = tf.keras.models.Model(
-        inputs=model.inputs,
-        outputs=[conv_layer.output, output_layer.output]
-    )
-    
-    # Ensure img_array is a tensor
+    # Ensure input is proper tensor with float32
     if not isinstance(img_array, tf.Tensor):
         img_array = tf.convert_to_tensor(img_array, dtype=tf.float32)
     else:
         img_array = tf.cast(img_array, tf.float32)
     
+    # Build intermediate model: input -> conv_layer output
+    conv_output_model = tf.keras.models.Model(
+        inputs=model.inputs,
+        outputs=conv_layer.output
+    )
+    
+    # Disable trainable to avoid issues with frozen layers
+    conv_output_model.trainable = False
+    
     with tf.GradientTape() as tape:
-        # Watch the input to ensure gradients flow back to it
+        # Manually watch to ensure gradient computation
         tape.watch(img_array)
-        conv_outputs, predictions = grad_model(img_array, training=False)
+        
+        # Get predictions from original model
+        predictions = model(img_array, training=False)
+        
+        # Get conv layer activations
+        conv_outputs = conv_output_model(img_array, training=False)
+        
+        # Get the predicted class
         pred_index = tf.argmax(predictions[0])
+        
+        # Use predictions as loss (the model's confidence in predicted class)
         class_channel = predictions[:, pred_index]
-
-    grads = tape.gradient(class_channel, conv_outputs)
     
-    # FIX: Check if gradients are None (model has frozen layers or incompatible architecture)
+    # Compute gradients of predictions w.r.t. conv layer outputs
+    # We need to compute d(predictions)/d(conv_outputs)
+    # Since predictions come from the model, we trace through manually
+    
+    with tf.GradientTape() as tape2:
+        tape2.watch(conv_outputs)
+        # Re-route: build a path from conv output through remaining layers
+        # Get all layers after conv_layer
+        conv_output_idx = None
+        for i, layer in enumerate(model.layers):
+            if layer == conv_layer:
+                conv_output_idx = i
+                break
+        
+        if conv_output_idx is None:
+            # Fallback: reconstruct predictions through a simpler path
+            predictions2 = model(img_array, training=False)
+            pred_index2 = tf.argmax(predictions2[0])
+            class_channel2 = predictions2[:, pred_index2]
+        else:
+            # Forward pass through remaining layers starting from conv_output
+            x = conv_outputs
+            for layer in model.layers[conv_output_idx + 1:]:
+                x = layer(x, training=False)
+            class_channel2 = x[:, pred_index]
+    
+    # Compute gradient
+    grads = tape2.gradient(class_channel2, conv_outputs)
+    
     if grads is None:
-        raise ValueError(
-            "Cannot compute gradients for Grad-CAM. "
-            "This may occur if: (1) the model has frozen layers, "
-            "(2) Conv2D layer is not connected to output, or "
-            "(3) model uses custom/Lambda layers that don't support automatic differentiation."
-        )
+        # If direct gradient fails, try a simpler approach: aggregate conv outputs
+        st.warning("⚠️ Direct gradient computation failed. Using alternative Grad-CAM (global average pooling).")
+        # Use simple global average pooling as alternative
+        conv_outputs_np = conv_outputs.numpy()
+        heatmap = np.mean(conv_outputs_np[0], axis=2)  # Average across channels
+    else:
+        # Standard Grad-CAM
+        pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+        conv_outputs_squeezed = conv_outputs[0]
+        heatmap = conv_outputs_squeezed @ pooled_grads[..., tf.newaxis]
+        heatmap = tf.squeeze(heatmap)
+        heatmap = tf.maximum(heatmap, 0)
+        heatmap_max = tf.math.reduce_max(heatmap)
+        if heatmap_max > 0:
+            heatmap = heatmap / heatmap_max
+        heatmap = heatmap.numpy()
     
-    pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
-    conv_outputs = conv_outputs[0]
-    heatmap = conv_outputs @ pooled_grads[..., tf.newaxis]
-    heatmap = tf.squeeze(heatmap)
-    
-    # FIX: Ensure heatmap is valid before normalization
-    heatmap_max = tf.math.reduce_max(heatmap)
-    if heatmap_max == 0:
-        raise ValueError("Heatmap contains all zeros. Conv layer may not be contributing to predictions.")
-    
-    heatmap = tf.maximum(heatmap, 0) / (heatmap_max + 1e-8)
-    return heatmap.numpy()
+    return heatmap
 
 
 def overlay_gradcam(original_img: Image.Image, heatmap: np.ndarray, alpha=0.45):
@@ -577,7 +608,6 @@ if result is not None:
     else:
         with st.spinner("Generating Grad-CAM..."):
             try:
-                # FIX: Properly convert numpy to tensor and handle dtype
                 img_array_np = preprocess_image(result["image"])
                 img_array_tf = tf.convert_to_tensor(img_array_np, dtype=tf.float32)
                 
@@ -592,7 +622,7 @@ if result is not None:
                     st.markdown("<div class='gradcam-label'>Grad-CAM Overlay</div>", unsafe_allow_html=True)
                     st.image(gradcam_img, use_container_width=True)
             except Exception as e:
-                st.error(f"Grad-CAM error: {e}")
+                st.error(f"Grad-CAM error: {str(e)}")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
