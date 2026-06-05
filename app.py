@@ -556,7 +556,7 @@ with right:
 
         # Determine if prediction is "Healthy" or "Disease Detected"
         is_healthy = CLASS_NAMES[class_idx] == 'Healthy'
-        status_text = "Good 🥬" if is_healthy else "Disease Detected 🔍"
+        status_text = "Healthy" if is_healthy else "Disease Detected 🔍"
 
         st.markdown(f"""
         <div style='text-align:center;margin-bottom:20px;'>
