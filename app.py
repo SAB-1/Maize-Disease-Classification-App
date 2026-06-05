@@ -83,15 +83,6 @@ html, body, [data-testid="stAppViewContainer"] {
     font-family: 'Plus Jakarta Sans', sans-serif !important;
 }
 
-/* Hide sidebar close button text, show only icon */
-button[kind="header"] {
-    font-size: 0 !important;
-}
-button[kind="header"]::before {
-    content: "❌";
-    font-size: 1.2rem !important;
-}
-
 /* ── Header bar ── */
 .farm-header {
     background: linear-gradient(135deg, #16a34a 0%, #15803d 60%, #14532d 100%);
@@ -127,24 +118,6 @@ button[kind="header"]::before {
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-}
-
-/* ── Slogan banner ── */
-.farm-slogan {
-    background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
-    border: 2px solid #16a34a;
-    border-radius: 12px;
-    padding: 16px 24px;
-    text-align: center;
-    margin-bottom: 24px;
-    box-shadow: 0 4px 12px rgba(22,163,74,0.12);
-}
-.farm-slogan-text {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: #14532d;
-    letter-spacing: 0.02em;
 }
 
 /* ── Stat tiles ── */
@@ -484,14 +457,12 @@ with st.sidebar:
         </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("**ABOUT THIS TOOL**")
-    st.info("🌾 **FARMEYE** uses advanced AI to detect maize leaf diseases in real-time. Simply upload a leaf image and get instant diagnostics with visual explanations.")
-    
-    st.markdown("**DATASET SOURCE**")
-    st.info("🗂️ Built on the Corn/Maize Leaf Disease Dataset from Kaggle — containing thousands of classified leaf samples.")
-    
-    st.markdown("**HOW IT WORKS**")
-    st.info("📸 Upload your maize leaf photo → 🤖 AI analyzes it → 🔬 Displays disease classification with confidence score and attention heatmap.")
+    st.markdown("**PROJECT INTRO**")
+    st.info("This project detects maize leaf diseases using deep learning.")
+    st.markdown("**DATASET**")
+    st.info("Corn/Maize Leaf Disease Dataset (Kaggle).")
+    st.markdown("**INFO**")
+    st.info("Upload a maize leaf image to classify into Blight, Common Rust, Gray Leaf Spot, or Healthy.")
 
     st.markdown("---")
     if last_conv_layer is not None:
@@ -513,16 +484,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════════
-# 9. Slogan banner
-# ════════════════════════════════════════════════════════════════
-st.markdown("""
-<div class='farm-slogan'>
-    <div class='farm-slogan-text'>👁️ See the disease, save the crop.</div>
-</div>
-""", unsafe_allow_html=True)
-
-# ════════════════════════════════════════════════════════════════
-# 10. Stat tiles — UPDATED with farm-themed metrics
+# 9. Stat tiles — UPDATED with farm-themed metrics
 # ════════════════════════════════════════════════════════════════
 t1, t2, t3 = st.columns(3)
 with t1:
@@ -545,7 +507,7 @@ with t3:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════════
-# 11. Main layout — Upload left | Results right
+# 10. Main layout — Upload left | Results right
 # ════════════════════════════════════════════════════════════════
 left, right = st.columns([1, 1], gap="large")
 
@@ -628,7 +590,7 @@ with right:
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════════
-# 12. Grad-CAM section (below, full width)
+# 11. Grad-CAM section (below, full width)
 # ════════════════════════════════════════════════════════════════
 result = st.session_state.get("last_result", None)
 if result is not None:
@@ -665,7 +627,7 @@ if result is not None:
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════════
-# 13. Footer TM (original, untouched)
+# 12. Footer TM (original, untouched)
 # ════════════════════════════════════════════════════════════════
 st.markdown(
     "<hr style='border:1px solid #d1f0da'>"
