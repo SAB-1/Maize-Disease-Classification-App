@@ -554,9 +554,8 @@ with right:
         class_idx  = result["class_idx"]
         confidence = result["confidence"]
 
-        # Determine if prediction is "Healthy" or "Disease Detected"
-        is_healthy = CLASS_NAMES[class_idx] == 'Healthy'
-        status_text = "Healthy" if is_healthy else "Disease Detected 🔍"
+        # Show the actual predicted class name
+        status_text = CLASS_NAMES[class_idx].replace('_', ' ')
 
         st.markdown(f"""
         <div style='text-align:center;margin-bottom:20px;'>
