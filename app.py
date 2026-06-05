@@ -50,7 +50,7 @@ def get_last_conv_layer(model):
 model = load_my_model()
 last_conv_layer = get_last_conv_layer(model)   # computed once globally
 
-# ════════════════════════════════════════════════════════════════
+# ═══════���════════════════════════════════════════════════════════
 # 3. Config
 # ════════════════════════════════════════════════════════════════
 IMG_SIZE = 256
@@ -328,13 +328,23 @@ def preprocess_image(image: Image.Image):
 def make_gradcam_heatmap(img_array, model, conv_layer):
     """
     Build a sub-model from model.inputs → (last_conv output, softmax output).
-    Uses the layer object directly and model.layers[-1].output to avoid
-    any graph-access issues with nested Sequential models.
+    Uses the layer object directly and finds the output layer by scanning.
     """
+    # Find the actual output layer (should be Dense with softmax)
+    output_layer = None
+    for layer in model.layers[::-1]:
+        if isinstance(layer, (tf.keras.layers.Dense,)):
+            output_layer = layer
+            break
+    
+    if output_layer is None:
+        raise ValueError("Could not find output Dense layer")
+    
     grad_model = tf.keras.models.Model(
         inputs=model.inputs,
-        outputs=[conv_layer.output, model.layers[-1].output]
+        outputs=[conv_layer.output, output_layer.output]
     )
+    
     with tf.GradientTape() as tape:
         conv_outputs, predictions = grad_model(img_array)
         pred_index = tf.argmax(predictions[0])
@@ -397,25 +407,13 @@ with st.sidebar:
     st.markdown("**INFO**")
     st.info("Upload a maize leaf image to classify into Blight, Common Rust, Gray Leaf Spot, or Healthy.")
 
-    # Debug panel — shows every layer so we can find the right one
     st.markdown("---")
     if last_conv_layer is not None:
         st.success(f"✅ Grad-CAM layer: `{last_conv_layer.name}`")
     else:
         st.error("❌ No Conv2D found — Grad-CAM unavailable.")
-    with st.expander("🔍 All model layers (debug)"):
-        def list_layers(m, indent=0):
-            rows = []
-            for layer in m.layers:
-                prefix = "  " * indent
-                has_out = "✅" if hasattr(layer, "_inbound_nodes") and layer._inbound_nodes else "❌"
-                rows.append(f"{prefix}{has_out} [{layer.__class__.__name__}] {layer.name}")
-                if hasattr(layer, "layers"):
-                    rows.extend(list_layers(layer, indent + 1))
-            return rows
-        st.code("\n".join(list_layers(model)))
 
-# ════════════════════════════════════════════════════════════════
+# ═���══════════════════════════════════════════════════════════════
 # 8. Header
 # ════════════════════════════════════════════════════════════════
 st.markdown("""
