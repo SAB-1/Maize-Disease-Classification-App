@@ -50,7 +50,7 @@ def get_last_conv_layer(model):
 model = load_my_model()
 last_conv_layer = get_last_conv_layer(model)   # computed once globally
 
-# ═══════���════════════════════════════════════════════════════════
+# ═══════───════════════════════════════════════════════════════════
 # 3. Config
 # ════════════════════════════════════════════════════════════════
 IMG_SIZE = 256
@@ -329,6 +329,8 @@ def make_gradcam_heatmap(img_array, model, conv_layer):
     """
     Build a sub-model from model.inputs → (last_conv output, softmax output).
     Uses the layer object directly and finds the output layer by scanning.
+    
+    FIX: Added proper gradient tape watching and None-checks for grads and heatmap.
     """
     # Find the actual output layer (should be Dense with softmax)
     output_layer = None
@@ -345,17 +347,41 @@ def make_gradcam_heatmap(img_array, model, conv_layer):
         outputs=[conv_layer.output, output_layer.output]
     )
     
+    # Ensure img_array is a tensor
+    if not isinstance(img_array, tf.Tensor):
+        img_array = tf.convert_to_tensor(img_array, dtype=tf.float32)
+    else:
+        img_array = tf.cast(img_array, tf.float32)
+    
     with tf.GradientTape() as tape:
-        conv_outputs, predictions = grad_model(img_array)
+        # Watch the input to ensure gradients flow back to it
+        tape.watch(img_array)
+        conv_outputs, predictions = grad_model(img_array, training=False)
         pred_index = tf.argmax(predictions[0])
         class_channel = predictions[:, pred_index]
 
     grads = tape.gradient(class_channel, conv_outputs)
+    
+    # FIX: Check if gradients are None (model has frozen layers or incompatible architecture)
+    if grads is None:
+        raise ValueError(
+            "Cannot compute gradients for Grad-CAM. "
+            "This may occur if: (1) the model has frozen layers, "
+            "(2) Conv2D layer is not connected to output, or "
+            "(3) model uses custom/Lambda layers that don't support automatic differentiation."
+        )
+    
     pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
     conv_outputs = conv_outputs[0]
     heatmap = conv_outputs @ pooled_grads[..., tf.newaxis]
     heatmap = tf.squeeze(heatmap)
-    heatmap = tf.maximum(heatmap, 0) / (tf.math.reduce_max(heatmap) + 1e-8)
+    
+    # FIX: Ensure heatmap is valid before normalization
+    heatmap_max = tf.math.reduce_max(heatmap)
+    if heatmap_max == 0:
+        raise ValueError("Heatmap contains all zeros. Conv layer may not be contributing to predictions.")
+    
+    heatmap = tf.maximum(heatmap, 0) / (heatmap_max + 1e-8)
     return heatmap.numpy()
 
 
@@ -413,7 +439,7 @@ with st.sidebar:
     else:
         st.error("❌ No Conv2D found — Grad-CAM unavailable.")
 
-# ═���══════════════════════════════════════════════════════════════
+# ═══════───════════════════════════════════════════════════════════
 # 8. Header
 # ════════════════════════════════════════════════════════════════
 st.markdown("""
@@ -551,7 +577,10 @@ if result is not None:
     else:
         with st.spinner("Generating Grad-CAM..."):
             try:
-                img_array_tf = tf.cast(preprocess_image(result["image"]), tf.float32)
+                # FIX: Properly convert numpy to tensor and handle dtype
+                img_array_np = preprocess_image(result["image"])
+                img_array_tf = tf.convert_to_tensor(img_array_np, dtype=tf.float32)
+                
                 heatmap = make_gradcam_heatmap(img_array_tf, model, last_conv_layer)
                 gradcam_img = overlay_gradcam(result["image"], heatmap)
 
