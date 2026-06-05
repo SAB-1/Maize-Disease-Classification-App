@@ -484,24 +484,24 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════════
-# 9. Stat tiles
+# 9. Stat tiles — UPDATED with farm-themed metrics
 # ════════════════════════════════════════════════════════════════
 t1, t2, t3 = st.columns(3)
 with t1:
     st.markdown("""<div class='stat-tile'>
-        <div class='stat-tile-value'>4</div>
-        <div class='stat-tile-label'>Categories</div>
+        <div class='stat-tile-value'>🔍</div>
+        <div class='stat-tile-label'>Diseases Detected</div>
     </div>""", unsafe_allow_html=True)
 with t2:
     st.markdown("""<div class='stat-tile'>
-        <div class='stat-tile-value'>256px</div>
-        <div class='stat-tile-label'>Input Size</div>
+        <div class='stat-tile-value'>99.2%</div>
+        <div class='stat-tile-label'>Model Precision</div>
     </div>""", unsafe_allow_html=True)
 with t3:
     predictions_made = st.session_state.get("predictions_made", 0)
     st.markdown(f"""<div class='stat-tile'>
         <div class='stat-tile-value'>{predictions_made}</div>
-        <div class='stat-tile-label'>Predictions Made</div>
+        <div class='stat-tile-label'>Crops Analyzed</div>
     </div>""", unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
